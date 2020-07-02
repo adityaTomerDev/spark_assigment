@@ -29,27 +29,37 @@ object FirstTask extends App {
       StructField("department", StringType, nullable = true)
     )
   )
-  
+
   def removeSpacesAndQuotes(rowData: Seq[String]) : Seq[String] = {
 
     rowData.map ( s => s.replaceAll("\\s", "").replaceAll("\"", ""))
 
   }
 
-  def removeSpacesAndQuotes = (s: String)  =>  if(s != null) s.replaceAll("\\s", "").replaceAll("\"", "") else s
+  def removeSpacesAndQuotes = (s: String)  =>  if(s != null) {
+    s.replaceAll("\\s", "").replaceAll("\"", "")
 
+  }
+   else {
+    s
+  }
+
+
+
+  def checkBenefits = (s: String) => if(s.isEmpty) "0" else s
 
   val df2 = df.columns.foldLeft(df)((curr, n) => curr.withColumnRenamed(n, n.replaceAll("\\s", "").replaceAll("\"", "") ))
 
+
   def check =  (values: Seq[String])  => {
     // println("2"+values(3)+"2")
-    values.find(x => x == null || x.isEmpty) match {
+    values.find(x => x == null ) match {
       case Some(x) =>
         CORRUPTED
       case None =>
         try {
-          val s: Float =
-            values(1).toInt
+
+          values(1).toInt
           values(2).toFloat
           values(3).toInt
           NOT_CORRUPTED
@@ -63,13 +73,21 @@ object FirstTask extends App {
     }
   }
 
+  def checkName = (n: String) => {
+    n.toCharArray.filter( a => (a >= 'A' && a <= 'Z') || (a >= 'a' && a <= 'z')).mkString("")
+  }
+
   val udf1 = udf(check)
   val udf2 = udf(removeSpacesAndQuotes)
-  val newdf = df2.columns.foldLeft(df2)((curr, n) => curr.withColumn(n, udf2(col(n))))
+  val udf3 = udf(checkBenefits)
+  val udf4 = udf(checkName)
+  val newdf = df2.columns.foldLeft(df2)((curr, n) => curr.withColumn(n, udf2(col(n)))).withColumn("benefits", udf3(col("benefits")))
     .withColumn("status", udf1(array("name", "age", "salary", "benefits", "department")) )
+    .withColumn("name", udf4(col("name")))
 
 
-  val filteredDf =  newdf.filter( r => r.getAs[String](5).equals(NOT_CORRUPTED)).withColumn("age", col("age").cast(IntegerType))
+  val filteredDf =  newdf.filter( r => r.getAs[String](5).equals(NOT_CORRUPTED)  && !r.getAs[String](0).equals("Test"))
+    .withColumn("age", col("age").cast(IntegerType))
     .withColumn("salary", col("salary").cast(FloatType))
     .withColumn("benefits", col("benefits").cast(IntegerType))
 
